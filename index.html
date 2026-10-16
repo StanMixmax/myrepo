@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unit Converter</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1d2330; --muted:#6b7280; --accent:#2563eb; --border:#e3e6eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12151b; --card:#1b1f27; --text:#e7e9ee; --muted:#9aa1ad; --accent:#60a5fa; --border:#2b313c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:520px; margin:48px auto; padding:0 16px; }
+  h1 { font-size:1.6rem; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 24px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; }
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; }
+  .tabs button { border:1px solid var(--border); background:transparent; color:var(--text); padding:7px 14px; border-radius:999px; cursor:pointer; font-size:.9rem; }
+  .tabs button.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  input, select { width:100%; padding:10px 12px; font-size:1rem; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); }
+  .swap { display:block; margin:6px auto 14px; border:1px solid var(--border); background:transparent; color:var(--text); border-radius:999px; padding:6px 14px; cursor:pointer; }
+  .result { font-size:1.4rem; font-weight:600; text-align:center; padding:14px; border-radius:8px; background:var(--bg); word-break:break-word; }
+  footer { color:var(--muted); font-size:.8rem; text-align:center; margin-top:20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Unit Converter</h1>
+  <p class="sub">Convert length, weight, temperature and volume.</p>
+  <div class="card">
+    <div class="tabs" id="tabs"></div>
+    <div class="row">
+      <input id="value" type="number" value="1" step="any" aria-label="Value">
+      <select id="from" aria-label="From unit"></select>
+    </div>
+    <button class="swap" id="swap" title="Swap units">⇅ Swap</button>
+    <div class="row">
+      <div class="result" id="result" style="grid-column:1/2">–</div>
+      <select id="to" aria-label="To unit"></select>
+    </div>
+  </div>
+  <footer>Hosted on GitHub Pages</footer>
+</main>
+<script>
+  // Factors convert each unit to the category's base unit
+  const units = {
+    Length: { base:"m", list:{ "Millimeter (mm)":0.001, "Centimeter (cm)":0.01, "Meter (m)":1, "Kilometer (km)":1000, "Inch (in)":0.0254, "Foot (ft)":0.3048, "Yard (yd)":0.9144, "Mile (mi)":1609.344 } },
+    Weight: { base:"kg", list:{ "Gram (g)":0.001, "Kilogram (kg)":1, "Tonne (t)":1000, "Ounce (oz)":0.028349523125, "Pound (lb)":0.45359237, "Stone (st)":6.35029318 } },
+    Volume: { base:"L", list:{ "Milliliter (ml)":0.001, "Liter (L)":1, "Cubic meter (m³)":1000, "Teaspoon (US)":0.00492892, "Cup (US)":0.2365882365, "Pint (US)":0.473176473, "Gallon (US)":3.785411784 } },
+    Temperature: { special:true, list:{ "Celsius (°C)":0, "Fahrenheit (°F)":0, "Kelvin (K)":0 } }
+  };
+  const toC = { "Celsius (°C)":v=>v, "Fahrenheit (°F)":v=>(v-32)*5/9, "Kelvin (K)":v=>v-273.15 };
+  const fromC = { "Celsius (°C)":v=>v, "Fahrenheit (°F)":v=>v*9/5+32, "Kelvin (K)":v=>v+273.15 };
+  const defaults = { Length:["Meter (m)","Foot (ft)"], Weight:["Kilogram (kg)","Pound (lb)"], Volume:["Liter (L)","Gallon (US)"], Temperature:["Celsius (°C)","Fahrenheit (°F)"] };
+
+  const $ = id => document.getElementById(id);
+  let cat = "Length";
+
+  function fill(sel, names, chosen) {
+    sel.innerHTML = names.map(n => `<option${n===chosen?" selected":""}>${n}</option>`).join("");
+  }
+  function setCategory(c) {
+    cat = c;
+    document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("active", b.textContent===c));
+    const names = Object.keys(units[c].list);
+    fill($("from"), names, defaults[c][0]);
+    fill($("to"), names, defaults[c][1]);
+    convert();
+  }
+  function fmt(n) {
+    if (!isFinite(n)) return "–";
+    const a = Math.abs(n);
+    if (a !== 0 && (a < 1e-4 || a >= 1e12)) return n.toExponential(4);
+    return Number(n.toPrecision(8)).toLocaleString(undefined, { maximumFractionDigits: 6 });
+  }
+  function convert() {
+    const v = parseFloat($("value").value), f = $("from").value, t = $("to").value;
+    if (isNaN(v)) { $("result").textContent = "–"; return; }
+    const out = units[cat].special ? fromC[t](toC[f](v)) : v * units[cat].list[f] / units[cat].list[t];
+    $("result").textContent = fmt(out);
+  }
+
+  Object.keys(units).forEach(c => {
+    const b = document.createElement("button");
+    b.textContent = c; b.onclick = () => setCategory(c);
+    $("tabs").appendChild(b);
+  });
+  ["value","from","to"].forEach(id => $(id).addEventListener("input", convert));
+  $("swap").onclick = () => { const f=$("from").value; $("from").value=$("to").value; $("to").value=f; convert(); };
+  setCategory("Length");
+</script>
+</body>
+</html>
